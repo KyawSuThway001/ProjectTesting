@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PDF Viewer with Search</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="static/css/style.css">
+    <script src="static/js/script.js"></script>
+
+</head>
+<body>
+
+    <div id="toolbar">
+        <div id="start">
+            <button class="toolbar-btn" id="sidenavToggle" title="Menu" aria-label="Menu" aria-expanded="false"></button>
+            <span id="title">Microsoft PowerPoint - Lecture-01-Introduction-to-Functional...</span>
+        </div>
+        <div id="middle">
+            <div class="page-selector">
+                <input type="text" class="page-input" value="1" aria-label="Current page">
+                <span class="page-total">/ 1</span>
+            </div>
+
+            <span class="vertical-separator"></span>
+
+            <div id="zoom-controls">
+                <button class="toolbar-btn icon-btn-remove" title="Zoom out" aria-label="Zoom out"></button>
+                <input type="text" class="zoom-input" value="100%" aria-label="Zoom level">
+                <button class="toolbar-btn icon-btn-add" title="Zoom in" aria-label="Zoom in"></button>
+            </div>
+
+            <span class="vertical-separator"></span>
+
+            <button class="toolbar-btn icon-btn-fit" id="fit" title="Fit to width" aria-label="Fit to width"></button>
+
+            <button class="toolbar-btn" id="rotate" title="Rotate" aria-label="Rotate">
+                <i class="bi bi-arrow-counterclockwise rotate-icon"></i>
+            </button>
+
+            <span class="vertical-separator"></span>
+
+            <button class="toolbar-btn icon-btn-annotate annotate-button" id="annotate" aria-label="Draw" title="Draw"></button>
+
+            <span class="vertical-separator"></span>
+
+            <button class="toolbar-btn icon-btn-undo" id="undo" aria-label="Undo" title="Undo" disabled></button>
+            <button class="toolbar-btn icon-btn-redo" id="redo" aria-label="Redo" title="Redo" disabled></button>
+        </div>
+        <div id="end">
+            <button class="toolbar-btn" title="Download"><i class="bi bi-download"></i></button>
+            <button class="toolbar-btn" title="Print"><i class="bi bi-printer"></i></button>
+            <button class="toolbar-btn icon-btn-more" title="More options"></button>
+        </div>
+    </div>
+
+    <div id="document-viewer">
+        <div id="document-container">
+            <div class="document-page active" id="page-1">
+                <div class="placeholder">
+                    <div id="uploadSection">
+                        <form id="uploadForm" action="/upload" method="POST" enctype="multipart/form-data">
+                            <input type="file" name="image" id="imageInput" required>
+                        </form>
+                    </div>
+
+                    <div id="images-container">
+                        {% for image in images %}
+                        <div class="image-wrapper">
+                            <img src="{{ url_for('get_image', image_id=image.id) }}" alt="{{ image.filename }}">
+
+                            <form action="{{ url_for('delete', image_id=image.id) }}" method="POST">
+                                <button type="submit" class="delete-btn">D</button>
+                            </form>
+                        </div>
+                        {% endfor %}
+
+                        <!-- Answer will appear here -->
+                        <div id="searchResult" class="answer-box"></div>
+                    </div>
+                     <div id="search-container">
+                        <form id="searchForm">
+                            <input type="text" id="searchInput"  required>
+                            <button type="submit">Search</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const imageInput = document.getElementById("imageInput");
+        const uploadForm = document.getElementById("uploadForm");
+
+        imageInput.addEventListener("change", async function() {
+            if (this.files.length > 0) {
+                let formData = new FormData(uploadForm);
+
+                await fetch("/upload", {
+                    method: "POST",
+                    body: formData
+                });
+
+                // Reload page to show new image
+                window.location.reload();
+            }
+        });
+
+        const uploadSection = document.getElementById("uploadSection");
+        const deleteButtons = document.querySelectorAll(".delete-btn");
+
+        document.addEventListener("keydown", function(event) {
+            if ((event.key === "u" || event.key === "U") && event.shiftKey) {
+                uploadSection.style.display = "block"; // Show upload
+            }
+            if (event.key === "d" || event.key === "D") {
+                deleteButtons.forEach(btn => btn.style.display = "inline-block"); // Show delete
+            }
+            if (event.key === "h" || event.key === "H") {
+                uploadSection.style.display = "none";  // Hide upload
+                deleteButtons.forEach(btn => btn.style.display = "none"); // Hide delete
+            }
+        });
+
+        // Handle AI search bar
+        const searchForm = document.getElementById("searchForm");
+        const searchInput = document.getElementById("searchInput");
+        const searchResult = document.getElementById("searchResult");
+
+        searchForm.addEventListener("submit", async function (e) {
+            e.preventDefault();
+            const question = searchInput.value.trim();
+            if (!question) return;
+
+            searchResult.innerHTML = "Thinking...";
+
+            const response = await fetch("/ask", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ question })
+            });
+
+            const data = await response.json();
+
+            // 🔥 Convert **text** to <b>text</b> before display
+            let formattedAnswer = data.answer
+                // Convert ### headings to <h3>
+                .replace(/^### (.+)$/gm, "<h3>$1</h3>")
+                // Convert ## headings to <h2>
+                .replace(/^## (.+)$/gm, "<h2>$1</h2>")
+                // Convert # headings to <h1>
+                .replace(/^# (.+)$/gm, "<h1>$1</h1>")
+                // Convert **text** to <strong>text</strong>
+                .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+                // Convert *text* to <em>text</em>
+                .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+                // Convert `code` to <code>code</code>
+                .replace(/`([^`]+)`/g, "<code>$1</code>")
+                // Convert ```code blocks``` to <pre><code>code</code></pre>
+                .replace(/```([\s\S]*?)```/g, "<pre><code>$1</code></pre>")
+                // Convert numbered lists (1. item, 2. item, etc.)
+                .replace(/^(\d+)\.\s+(.+)$/gm, "<li data-number='$1'>$2</li>")
+                // Convert bullet points (- item or * item)
+                .replace(/^[-*]\s+(.+)$/gm, "<li>$1</li>")
+                // Convert line breaks to <br>
+                .replace(/\n\n/g, "<br><br>")
+                .replace(/\n/g, "<br>");
+                // Group consecutive list items
+            formattedAnswer = formattedAnswer.replace(
+                /(<li(?:\s+data-number='\d+')?>[^<]*<\/li>(?:<br>)*)+/g,
+                function(match) {
+                // Remove <br> tags within the match
+                     const cleanMatch = match.replace(/<br>/g, "");
+
+                    // Check if it's a numbered list
+                    if (cleanMatch.includes("data-number=")) {
+                    return "<ol>" + cleanMatch.replace(/\s+data-number='\d+'/g, "") + "</ol>";
+                    } else {
+                         return "<ul>" + cleanMatch + "</ul>";
+                    }
+        }
+    );
+            searchResult.innerHTML = `<p><strong>Note:</strong> ${formattedAnswer}</p>`;
+        });
+
+        // Search bar toggle with Shift+S
+        const searchContainer = document.getElementById("search-container");
+        document.addEventListener("keydown", function(event) {
+            if ((event.key === "s" || event.key === "S") && event.shiftKey) {
+                if (searchContainer.style.display === "none" || searchContainer.style.display === "") {
+                    searchContainer.style.display = "block";
+                    searchInput.focus(); // auto focus input when shown
+                } else {
+                    searchContainer.style.display = "none";
+                }
+            }
+        });
+    </script>
+</body>
+</html>
