@@ -1,5 +1,6 @@
 import os
 import secrets
+import io
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, redirect, url_for, flash, make_response, jsonify, Response
 from flask_sqlalchemy import SQLAlchemy
@@ -7,6 +8,7 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, log
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from openai import OpenAI
+from PIL import Image as PILImage  # ✅ Pillow for normalization
 
 # ----------------------
 # Load .env
@@ -132,8 +134,8 @@ def reset_device(user_id):
 @app.route("/create_users")
 def create_users():
     """Run once to create allowed users"""
-    emails = ["user1.com", "user2.com", "user3.com"]
-    passwords = ["pass1", "pass2", "pass3"]
+    emails = ["user1.com", "user2.com", "user3.com", "user4.com"]
+    passwords = ["pass1", "pass2", "pass3", "pass4"]
 
     for email, pwd in zip(emails, passwords):
         if not Login_Info.query.filter_by(email=email).first():
@@ -165,11 +167,18 @@ def upload():
         return "No filename", 400
 
     filename = secure_filename(file.filename)
-    mimetype = file.mimetype
-    if not mimetype:
-        return "Bad upload", 400
 
-    new_image = Image(filename=filename, data=file.read(), mimetype=mimetype, user_id=current_user.id)
+    # ✅ Normalize uploaded image with Pillow
+    try:
+        img = PILImage.open(file.stream)   # read file into Pillow
+        output = io.BytesIO()
+        img.save(output, format="PNG")     # always save as clean PNG
+        data = output.getvalue()
+        mimetype = "image/png"
+    except Exception as e:
+        return f"Image processing error: {str(e)}", 400
+
+    new_image = Image(filename=filename, data=data, mimetype=mimetype, user_id=current_user.id)
     db.session.add(new_image)
     db.session.commit()
 
