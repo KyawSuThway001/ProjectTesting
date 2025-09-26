@@ -349,10 +349,7 @@ body {
 .answer-box {
     margin-top: 15px;
     padding: 12px;
-    background: #f1f5f9;
-    border-radius: 6px;
     font-size: 16px;
-    color: #111827;
     max-width: 80%;
 }
 .answer-box strong {
@@ -395,19 +392,7 @@ body {
     }
 }
 
-/* Answer box styling */
-.answer-box {
-           margin-top: 15px;
-           padding: 12px;
-           background: #f1f5f9;
-           border-radius: 6px;
-           font-size: 16px;
-           color: #111827;
-           max-width: 80%;
-}
-.answer-box strong {
-            color: #2563eb;
-}
+
 
 
 /* =========================================================
